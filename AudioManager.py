@@ -42,7 +42,11 @@ def get_background_noise(arr):
 
 def volume_score(arr):
     arr = np.absolute(arr)
-    return np.mean(arr[arr>np.percentile(arr, 80)])/np.mean(arr[arr<np.percentile(arr, 20)])
+    denom = np.mean(arr[arr<np.percentile(arr, 20)])
+    if denom != 0:
+        return np.mean(arr[arr>np.percentile(arr, 80)])/denom
+    else:
+        return 100000000
 
 def snr(a): 
     a = np.asanyarray(a) 
