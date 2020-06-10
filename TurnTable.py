@@ -8,36 +8,43 @@ from Snooper import Snooper
 import concurrent.futures
 import argparse
 import pyaudio
+from StepperController import StepperController
 
 class TurnTable:
 
     def __init__(self,device_inds):
         self.recognizer = sr.Recognizer()
-        self.snoopers = [Snooper(ind,self.recognizer) for ind in device_inds]
+        self.snoopers = []
         self.should_turn = False
         self.talk_frames = -1
+        self.vol_0 = 0
+        self.vol_1 = 0
+        self.vol_2 = 0
+        self.step_controller = None
+    def connect(self):
+        self.snoopers = [Snooper(ind,self.recognizer) for ind in device_inds]
+        self.step_controller = StepperController()
+
 
     def _response_callback(self,talk_length):
         self.should_turn = True
-        print(talk_length)
         self.talk_frames = talk_length
     
     def turn(self):
         for snooper in self.snoopers:
             print(f'snooper {snooper.mic_num}: {snooper.get_volume(num_frames=self.talk_frames)}')
-        self.talk_frames = -1
-        time.sleep(1)
+        self.vol_0 = snooper[0].get_volume(num_frames=self.talk_frames)
+        self.vol_1 = snooper[1].get_volume(num_frames=self.talk_frames)
+        self.vol_2 = snooper[2].get_volume(num_frames=self.talk_frames)
+        source_angle = self.step_controller.get_source_angle(self.vol_0,self.vol_1,self.vol_2)
+        self.step_controller.goto_angle(source_angle)
         self.should_turn = False
-        print('am turning')
-        #TODO figure out how to manage turning lmao
     
     def record(self):
         with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
             for snooper in self.snoopers:
                 executor.submit(snooper.record,self._response_callback)
             self.listen()
-        # self.snoopers[0].record(self._response_callback)
-        print('why not continue')
     
     def listen(self):
         while True:
@@ -57,5 +64,6 @@ args = parser.parse_args()
 print_devices()
 if not args.dont_print:
     inds = get_device_inds()
+    assert len(inds) == 3
     tt = TurnTable(inds)
     tt.record()
